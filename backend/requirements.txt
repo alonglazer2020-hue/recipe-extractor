@@ -1,0 +1,12 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.6
+# Pinned to a nightly build: the current stable release (2026.7.4) has a broken
+# TikTok extractor ("Unable to extract universal data for rehydration"); this
+# nightly build fixes it. Safe to loosen back to a plain lower-bound once a
+# stable release newer than this date ships with the fix included.
+yt-dlp[default]==2026.7.23.234303.dev0
+faster-whisper>=1.0.3
+google-genai>=1.0.0
+pydantic>=2.9.2
+python-multipart>=0.0.9
+python-dotenv>=1.0.0
