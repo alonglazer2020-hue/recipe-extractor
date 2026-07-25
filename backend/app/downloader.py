@@ -13,6 +13,12 @@ class DownloadError(Exception):
 
 def _friendly_message(url: str, raw_error: str) -> str:
     lowered = raw_error.lower()
+    if "not a bot" in lowered or "confirm you" in lowered:
+        return (
+            "YouTube is blocking automated downloads from this server right now "
+            "(a known issue with cloud-hosted services, not this specific video) "
+            "— a TikTok or Instagram Reels link is more reliable at the moment."
+        )
     if "private" in lowered or "login" in lowered or "sign in" in lowered:
         return "This video is private or requires login — it can't be downloaded."
     if "unsupported url" in lowered or "no extractor" in lowered:
@@ -24,9 +30,9 @@ def _friendly_message(url: str, raw_error: str) -> str:
     if "rate" in lowered or "429" in lowered or "too many requests" in lowered:
         return "The platform is rate-limiting downloads right now — try again in a bit."
     return (
-        "Couldn't download this video. TikTok and Instagram actively block "
-        "automated downloads and their formats change often — if this keeps "
-        "happening, a YouTube link is the most reliable option."
+        "Couldn't download this video. Formats and anti-bot protections on "
+        "these platforms change often — if this keeps happening, try a "
+        "different link or platform."
     )
 
 
