@@ -1,7 +1,7 @@
 import React from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme';
-import { Recipe } from '../types';
+import { Recipe, Source } from '../types';
 
 type SaveAction =
   | { type: 'save'; saved: boolean; onSave: () => void }
@@ -9,31 +9,23 @@ type SaveAction =
 
 interface Props {
   recipe: Recipe;
-  sourceUrl: string;
-  sourceTitle: string;
-  sourcePlatform: string;
+  sources: Source[];
   saveAction: SaveAction;
 }
 
-export default function RecipeView({
-  recipe,
-  sourceUrl,
-  sourceTitle,
-  sourcePlatform,
-  saveAction,
-}: Props) {
+export default function RecipeView({ recipe, sources, saveAction }: Props) {
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <Text style={styles.title}>{recipe.title}</Text>
 
-      {!!sourceUrl && (
-        <Pressable onPress={() => Linking.openURL(sourceUrl)}>
+      {sources.map((s, i) => (
+        <Pressable key={i} onPress={() => Linking.openURL(s.url)}>
           <Text style={styles.sourceLink} numberOfLines={1}>
-            {sourcePlatform ? `${sourcePlatform} · ` : ''}
-            {sourceTitle || sourceUrl}
+            {s.platform ? `${s.platform} · ` : ''}
+            {s.title || s.url}
           </Text>
         </Pressable>
-      )}
+      ))}
 
       {recipe.oven_temp_original && (
         <View style={styles.ovenBox}>

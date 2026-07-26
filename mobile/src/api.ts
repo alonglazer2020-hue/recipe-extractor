@@ -1,11 +1,34 @@
 import { BACKEND_URL } from './config';
 import { JobResponse } from './types';
 
-export async function createJob(url: string): Promise<JobResponse> {
-  const res = await fetch(`${BACKEND_URL}/jobs`, {
+// The free Render backend spins down after 15 min idle, so the first request after a
+// while can fail to connect while it's waking up rather than just being slow. Retry a
+// few times with a delay instead of surfacing an error immediately.
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  attempts = 4,
+  delayMs = 4000,
+): Promise<Response> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fetch(url, options);
+    } catch (e) {
+      lastErr = e;
+      if (i < attempts - 1) {
+        await new Promise<void>(resolve => setTimeout(() => resolve(), delayMs));
+      }
+    }
+  }
+  throw lastErr;
+}
+
+export async function createJob(urls: string[], note?: string): Promise<JobResponse> {
+  const res = await fetchWithRetry(`${BACKEND_URL}/jobs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url }),
+    body: JSON.stringify({ urls, note: note && note.trim() ? note.trim() : undefined }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');

@@ -18,9 +18,7 @@ export default function RecipeScreen({ route, navigation }: Props) {
       <SafeAreaView style={styles.container} edges={['bottom']}>
         <RecipeView
           recipe={saved.recipe}
-          sourceUrl={saved.source_url}
-          sourceTitle={saved.source_title}
-          sourcePlatform={saved.source_platform}
+          sources={saved.sources}
           saveAction={{
             type: 'remove',
             onRemove: async () => {
@@ -49,11 +47,13 @@ function FreshResult({ navigation, result }: { navigation: Props['navigation']; 
             {result.reason_if_no_recipe ||
               "This video doesn't appear to contain a recipe."}
           </Text>
-          {!!result.source_url && (
-            <Pressable onPress={() => Linking.openURL(result.source_url)}>
-              <Text style={styles.link}>View original video</Text>
+          {result.sources.map((s, i) => (
+            <Pressable key={i} onPress={() => Linking.openURL(s.url)}>
+              <Text style={styles.link}>
+                {result.sources.length > 1 ? `View video ${i + 1}` : 'View original video'}
+              </Text>
             </Pressable>
-          )}
+          ))}
           <Pressable style={styles.backButton} onPress={() => navigation.popToTop()}>
             <Text style={styles.backButtonText}>Try another link</Text>
           </Pressable>
@@ -99,14 +99,12 @@ function FreshResult({ navigation, result }: { navigation: Props['navigation']; 
 
       <RecipeView
         recipe={recipe}
-        sourceUrl={result.source_url}
-        sourceTitle={result.source_title}
-        sourcePlatform={result.source_platform}
+        sources={result.sources}
         saveAction={{
           type: 'save',
           saved: isSaved,
           onSave: async () => {
-            await saveRecipe(recipe, result.source_url, result.source_title, result.source_platform);
+            await saveRecipe(recipe, result.sources);
             setSavedIndices(prev => new Set(prev).add(activeIndex));
           },
         }}

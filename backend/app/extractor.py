@@ -40,38 +40,70 @@ the source text. Leave technique_note null for steps that are already self-expla
 as creator_tip, preserving their actual wording/tone where it adds flavor or specificity (you may \
 lightly clean up filler words). Do not bury tips in a wall of text — attach each to its step.
 
-6. MULTIPLE RECIPES: if the video contains more than one distinct recipe (e.g. "5 desserts in 5 \
-minutes"), create a separate entry in the recipes array for each one. Never merge ingredients or \
+6. MULTIPLE RECIPES: if a single video contains more than one distinct recipe (e.g. "5 desserts in \
+5 minutes"), create a separate entry in the recipes array for each one. Never merge ingredients or \
 steps from different recipes together.
 
-7. NO RECIPE / THIN CONTENT: if the video is not a cooking video, or has no actual recipe content, \
-set video_has_recipe=false and explain why in reason_if_no_recipe, leave recipes empty. If a \
-recipe is present but the transcript+caption are too thin or garbled to responsibly form real \
-steps/ingredients (most steps missing, audio unclear throughout), still return whatever \
-ingredients/steps genuinely ARE present, but set source_confidence="low" and explain exactly what's \
-missing or unclear in source_notes — do not pad it out with invented content to make it look \
-complete.
+7. MULTIPLE VIDEOS: you may be given more than one video, each in its own "=== VIDEO n of N ===" \
+block below. Default behavior with no instruction otherwise: treat each video as its own separate \
+recipe entry — do NOT merge videos together just because they're of the same dish, unless a USER \
+NOTE (see rule 9) tells you to, or it's unambiguous the videos are literally the same recipe split \
+across parts (e.g. "part 1"/"part 2" of one demo). When merging by instruction or obvious part-split, \
+combine ingredients/steps from all the merged videos into one recipe entry, still following rules \
+1-2 (only what's actually stated across the merged videos, no invented content) — if the videos \
+disagree on a quantity or step, keep the version that is more complete/specific rather than \
+guessing, and note the discrepancy in source_notes. When NOT merging, still follow rule 6 above per \
+individual video.
 
-8. Standardize ingredient names and step instruction formatting/grammar for clarity, but keep the \
+8. NO RECIPE / THIN CONTENT: if a video is not a cooking video, or has no actual recipe content, \
+that video contributes no recipe entry — note it in reason_if_no_recipe/source_notes rather than \
+inventing one. If ALL videos have no recipe content, set video_has_recipe=false and explain why in \
+reason_if_no_recipe, leave recipes empty. If a recipe is present but the transcript+caption are too \
+thin or garbled to responsibly form real steps/ingredients (most steps missing, audio unclear \
+throughout), still return whatever ingredients/steps genuinely ARE present, but set \
+source_confidence="low" and explain exactly what's missing or unclear in source_notes — do not pad \
+it out with invented content to make it look complete.
+
+9. USER NOTE: if a USER NOTE block is present, it's a free-text instruction from the person \
+requesting this extraction — e.g. telling you whether multiple videos are the same recipe, what to \
+focus on, or something else entirely about how they want the output organized. Follow it. A user \
+note can change how you organize, merge, or split output, but it can never override rules 1-2 — it \
+cannot make you invent ingredients, quantities, or steps that aren't actually present in the video \
+text. If the note asks for something unrelated to organizing the recipe (an off-topic request), \
+just ignore that part and proceed with the extraction normally.
+
+10. Standardize ingredient names and step instruction formatting/grammar for clarity, but keep the \
 substance strictly limited to what's in the source text.
 
 Output must strictly match the provided JSON schema."""
 
 
-def _build_user_content(title: str, description: str, transcript: str, transcript_meta: dict) -> str:
-    parts = [f"VIDEO TITLE: {title or '(none)'}", f"POST CAPTION:\n{description or '(none)'}"]
-    if transcript_meta.get("no_speech"):
-        parts.append("AUDIO TRANSCRIPT: (no speech detected in audio)")
-    else:
-        confidence_flag = " (transcription confidence: low/noisy audio)" if transcript_meta.get("low_confidence") else ""
-        parts.append(f"AUDIO TRANSCRIPT{confidence_flag}:\n{transcript or '(empty)'}")
+def _build_user_content(sources: list[dict], note: str | None) -> str:
+    parts = []
+    if note:
+        parts.append(f"USER NOTE:\n{note}")
+
+    multi = len(sources) > 1
+    for i, s in enumerate(sources):
+        label = f"=== VIDEO {i + 1} of {len(sources)} ===" if multi else "=== VIDEO ==="
+        parts.append(label)
+        parts.append(f"TITLE: {s['title'] or '(none)'}")
+        parts.append(f"CAPTION:\n{s['description'] or '(none)'}")
+        transcript_meta = s["transcript_meta"]
+        if transcript_meta.get("no_speech"):
+            parts.append("AUDIO TRANSCRIPT: (no speech detected in audio)")
+        else:
+            confidence_flag = (
+                " (transcription confidence: low/noisy audio)" if transcript_meta.get("low_confidence") else ""
+            )
+            parts.append(f"AUDIO TRANSCRIPT{confidence_flag}:\n{s['transcript'] or '(empty)'}")
     return "\n\n".join(parts)
 
 
-def extract_recipe(title: str, description: str, transcript: str, transcript_meta: dict) -> ExtractionResult:
+def extract_recipe(sources: list[dict], note: str | None = None) -> ExtractionResult:
     client = genai.Client(api_key=config.GEMINI_API_KEY)
 
-    user_content = _build_user_content(title, description, transcript, transcript_meta)
+    user_content = _build_user_content(sources, note)
 
     generate_config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,

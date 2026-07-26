@@ -3,7 +3,7 @@ import threading
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 
 from . import jobs
 from .transcriber import get_model
@@ -29,7 +29,8 @@ def _warm_up_whisper_model() -> None:
 
 
 class CreateJobRequest(BaseModel):
-    url: HttpUrl
+    urls: list[HttpUrl] = Field(min_length=1, max_length=5)
+    note: str | None = None
 
 
 class JobResponse(BaseModel):
@@ -47,7 +48,8 @@ def health() -> dict:
 
 @app.post("/jobs", response_model=JobResponse)
 def create_job(req: CreateJobRequest, background_tasks: BackgroundTasks) -> JobResponse:
-    job = jobs.create_job(str(req.url))
+    note = req.note.strip() if req.note and req.note.strip() else None
+    job = jobs.create_job([str(u) for u in req.urls], note)
     background_tasks.add_task(jobs.run_job, job.id)
     return JobResponse(job_id=job.id, status=job.status, message=job.message)
 

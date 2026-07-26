@@ -16,7 +16,7 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 export default function LoadingScreen({ route, navigation }: Props) {
-  const { url } = route.params;
+  const { urls, note } = route.params;
   const [message, setMessage] = useState('Starting…');
   const [errorText, setErrorText] = useState<string | null>(null);
   const cancelRef = useRef<() => void>(() => {});
@@ -26,13 +26,13 @@ export default function LoadingScreen({ route, navigation }: Props) {
 
     (async () => {
       try {
-        const job = await createJob(url);
+        const job = await createJob(urls, note);
         if (cancelled) return;
-        setMessage(STAGE_LABELS[job.status] ?? job.message);
+        setMessage(job.message || STAGE_LABELS[job.status] || job.status);
 
         const { promise, cancel } = pollJob(job.job_id, update => {
           if (cancelled) return;
-          setMessage(STAGE_LABELS[update.status] ?? update.message);
+          setMessage(update.message || STAGE_LABELS[update.status] || update.status);
         });
         cancelRef.current = cancel;
 
@@ -57,7 +57,7 @@ export default function LoadingScreen({ route, navigation }: Props) {
       cancelRef.current();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url]);
+  }, [urls, note]);
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>

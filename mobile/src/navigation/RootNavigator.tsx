@@ -12,7 +12,7 @@ export type RecipeScreenParams =
 
 export type RootStackParamList = {
   Home: undefined;
-  Loading: { url: string };
+  Loading: { urls: string[]; note?: string };
   Recipe: RecipeScreenParams;
 };
 

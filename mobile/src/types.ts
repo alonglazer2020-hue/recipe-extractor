@@ -21,15 +21,19 @@ export interface Recipe {
   steps: Step[];
 }
 
+export interface Source {
+  url: string;
+  title: string;
+  platform: string;
+}
+
 export interface ExtractionResult {
   video_has_recipe: boolean;
   reason_if_no_recipe: string | null;
   source_confidence: 'high' | 'medium' | 'low';
   source_notes: string | null;
   recipes: Recipe[];
-  source_url: string;
-  source_title: string;
-  source_platform: string;
+  sources: Source[];
 }
 
 export type JobStatus =
@@ -51,8 +55,6 @@ export interface JobResponse {
 export interface SavedRecipe {
   id: string;
   recipe: Recipe;
-  source_url: string;
-  source_title: string;
-  source_platform: string;
+  sources: Source[];
   saved_at: string;
 }

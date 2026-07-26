@@ -17,13 +17,22 @@ import { getSavedRecipes } from '../storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
+const MAX_URLS = 5;
+
 function isLikelyVideoUrl(value: string): boolean {
   if (!/^https?:\/\//i.test(value.trim())) return false;
   return /tiktok\.com|instagram\.com|youtube\.com|youtu\.be/i.test(value);
 }
 
+function extractUrls(raw: string): string[] {
+  const tokens = raw.split(/[\s,]+/).map(t => t.trim()).filter(Boolean);
+  const urls = tokens.filter(t => /^https?:\/\//i.test(t));
+  return Array.from(new Set(urls));
+}
+
 export default function HomeScreen({ navigation }: Props) {
-  const [url, setUrl] = useState('');
+  const [linksText, setLinksText] = useState('');
+  const [note, setNote] = useState('');
   const [touched, setTouched] = useState(false);
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
 
@@ -33,41 +42,80 @@ export default function HomeScreen({ navigation }: Props) {
     }, []),
   );
 
-  const showUrlWarning = touched && url.trim().length > 0 && !isLikelyVideoUrl(url);
+  const urls = extractUrls(linksText);
+  const nonUrlTokenPresent =
+    linksText.trim().length > 0 &&
+    linksText.split(/[\s,]+/).map(t => t.trim()).filter(Boolean).length > urls.length;
+  const showUrlWarning =
+    touched && urls.length > 0 && !urls.every(isLikelyVideoUrl);
+  const tooManyUrls = urls.length > MAX_URLS;
 
   const onExtract = () => {
-    const trimmed = url.trim();
-    if (!trimmed) {
+    if (urls.length === 0) {
       setTouched(true);
       return;
     }
-    navigation.navigate('Loading', { url: trimmed });
+    navigation.navigate('Loading', {
+      urls: urls.slice(0, MAX_URLS),
+      note: note.trim() || undefined,
+    });
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.inputSection}>
-        <Text style={styles.label}>Paste a cooking video link</Text>
+        <Text style={styles.label}>Paste one or more cooking video links</Text>
         <TextInput
-          style={styles.input}
-          placeholder="TikTok, Instagram Reels, or YouTube URL"
+          style={[styles.input, styles.linksInput]}
+          placeholder={'TikTok, Instagram Reels, or YouTube URLs\n(one per line, or separated by spaces)'}
           placeholderTextColor={colors.textMuted}
-          value={url}
+          value={linksText}
           onChangeText={t => {
-            setUrl(t);
+            setLinksText(t);
             if (!touched) setTouched(true);
           }}
           autoCapitalize="none"
           autoCorrect={false}
-          keyboardType="url"
+          multiline
+          textAlignVertical="top"
         />
+        {nonUrlTokenPresent && (
+          <Text style={styles.warningText}>
+            Ignoring some text that doesn't look like a link.
+          </Text>
+        )}
         {showUrlWarning && (
           <Text style={styles.warningText}>
             That doesn't look like a TikTok, Instagram, or YouTube link — you can still try it.
           </Text>
         )}
+        {tooManyUrls && (
+          <Text style={styles.warningText}>
+            Only the first {MAX_URLS} links will be used.
+          </Text>
+        )}
+        {urls.length > 1 && (
+          <Text style={styles.hintText}>{urls.length} links found</Text>
+        )}
+
+        <Text style={[styles.label, styles.noteLabel]}>Notes for the extractor (optional)</Text>
+        <TextInput
+          style={[styles.input, styles.noteInput]}
+          placeholder={
+            'e.g. "These two links are the same recipe, combine them" or ' +
+            '"Only use the second video, the first is just an intro"'
+          }
+          placeholderTextColor={colors.textMuted}
+          value={note}
+          onChangeText={setNote}
+          multiline
+          textAlignVertical="top"
+        />
+
         <Pressable style={styles.button} onPress={onExtract}>
-          <Text style={styles.buttonText}>Extract Recipe</Text>
+          <Text style={styles.buttonText}>
+            {urls.length > 1 ? `Extract ${urls.length} Recipes` : 'Extract Recipe'}
+          </Text>
         </Pressable>
       </View>
 
@@ -92,7 +140,8 @@ export default function HomeScreen({ navigation }: Props) {
                   {item.recipe.title}
                 </Text>
                 <Text style={styles.savedMeta}>
-                  {item.source_platform || 'source'} ·{' '}
+                  {item.sources[0]?.platform || 'source'}
+                  {item.sources.length > 1 ? ` +${item.sources.length - 1} more` : ''} ·{' '}
                   {new Date(item.saved_at).toLocaleDateString()}
                 </Text>
               </Pressable>
@@ -118,7 +167,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.text,
   },
+  linksInput: { minHeight: 80 },
+  noteInput: { minHeight: 70 },
+  noteLabel: { marginTop: 16 },
   warningText: { color: colors.warning, marginTop: 8, fontSize: 13 },
+  hintText: { color: colors.textMuted, marginTop: 8, fontSize: 13 },
   button: {
     backgroundColor: colors.accent,
     borderRadius: 10,
